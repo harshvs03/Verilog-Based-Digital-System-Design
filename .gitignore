@@ -1,0 +1,9 @@
+*.vcd
+*.vvp
+*.log
+*.wlf
+*.jou
+*.pb
+*.str
+simulation/*.vvp
+simulation/*.vcd
