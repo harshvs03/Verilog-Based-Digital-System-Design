@@ -1,0 +1,140 @@
+`timescale 1ns/1ps
+module mod_q3 (
+    input  reset, start, clk,
+    input  [9:0] a_in, b_in,
+    output reg ready,
+    output wire [9:0] out
+);
+
+
+localparam S_rst = 3'd0;
+localparam S_start = 3'd1;
+localparam S_cmp  = 3'd2;
+localparam S_loop  = 3'd3;
+localparam S_ready = 3'd4;
+
+reg [2:0] state, next_state;
+
+reg [9:0] a, b;
+reg load_a, load_b, update_a;
+
+// remainder is in a; if b==0, define result as 0 for your TB
+assign out = (b == 10'd0) ? 10'd0 : a;
+
+//////////////////////////////////////////////////////////////////////////////
+//Controller Design
+
+// -------------------------
+// State register
+// -------------------------
+always @(posedge clk or posedge reset) 
+begin
+  	if (reset) 
+		state <= S_rst;
+    else
+	begin       
+		case (state)
+        S_rst: 
+		begin
+          	if (start) 
+				state <= S_start;
+			else
+				state <= S_rst;
+        	end
+	    S_start: state <= S_cmp;
+		S_cmp: 
+		begin
+          		if (b == 10'd0)    
+            			state <= S_ready;     // defined as 0 in 'out'
+          		else if (a >= b) 
+            			state <= S_loop;     // defined as 0 in 'out' = S_loop;      // do one subtraction
+          		else         
+            			state <= S_ready;     // remainder found
+       	end
+	    S_loop: state <= S_cmp;
+		S_ready:
+		begin
+			if (reset)
+				state <= S_rst;
+			else if (start)
+				state <= S_start;
+			else
+				state <= S_ready;
+		end
+		default: state <= S_rst;	 
+		endcase
+	end
+end
+
+// -------------------------
+// outputs (combinational)
+// -------------------------
+
+always @ (*)
+begin
+	case(state)
+	S_start: 
+	begin
+		load_a <= 1;
+		load_b <= 1;
+	end
+	S_loop:
+	begin
+		load_a <= 1;
+		load_b <= 0;
+	end
+	default:	
+	begin
+		load_a <= 0;
+		load_b <= 0;		
+	end
+	endcase
+end
+
+always @(*)
+begin
+	if (state == S_ready)
+		ready <= 1;
+	else
+		ready <= 0;
+end
+
+
+always @(*) 
+begin
+	if (state == S_loop)
+		update_a <= 1;
+	else
+		update_a <= 0;
+end
+////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
+
+/////////////////////////////////////////////////////////////////
+// -------------------------
+// Datapath registers
+// -------------------------
+always @(posedge clk or posedge reset) 
+begin
+	if (reset)       
+		a <= 10'd0;
+    else if (load_a) 
+		a <= update_a ? (a - b) : a_in;
+	else
+		a <= a;
+end
+
+always @(posedge clk or posedge reset) 
+begin
+	if (reset)       
+		b <= 10'd0;
+    else if (load_b) 
+		b <= b_in;
+	else
+		b <= b;
+end
+////////////////////////////////////////////////////////////////////////
+endmodule
